@@ -1,0 +1,13 @@
+node_modules/
+dist/
+build/
+.env
+.git
+.DS_Store
+*.swp
+
+backend/bin/
+backend/tmp/
+
+infra/
+docs/
