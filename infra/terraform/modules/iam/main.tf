@@ -8,7 +8,7 @@ resource "aws_iam_openid_connect_provider" "github" {
 # Create IAM Role that GitHub Actions can assume
 data "aws_iam_policy_document" "github_assume_role" {
   statement {
-    actions = ["sts:AssumeRoleWithWebIdentity"]
+    actions = ["sts:AssumeRoleWithWebIdentity", "sts:TagSession"]
     effect  = "Allow"
     
     principals {
