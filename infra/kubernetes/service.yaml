@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: cloudboard-backend-service
+  namespace: cloudboard
+spec:
+  type: LoadBalancer
+  selector:
+    app: cloudboard-backend
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080

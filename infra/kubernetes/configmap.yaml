@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cloudboard-config
+  namespace: cloudboard
+data:
+  PORT: "8080"
+  DB_HOST: "postgres-service"
+  DB_PORT: "5432"
+  DB_USER: "postgres"
+  DB_NAME: "cloudboard"
+  DB_SSLMODE: "disable"
+  STORAGE_BACKEND: "local"
+  LOCAL_STORAGE_PATH: "/uploads"

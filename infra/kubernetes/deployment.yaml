@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cloudboard-backend
+  namespace: cloudboard
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: cloudboard-backend
+  template:
+    metadata:
+      labels:
+        app: cloudboard-backend
+    spec:
+      containers:
+      - name: backend
+        # In a real environment, replace this with your ECR image URL
+        image: <AWS_ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/cloudboard-backend:latest
+        ports:
+        - containerPort: 8080
+        envFrom:
+        - configMapRef:
+            name: cloudboard-config
+        - secretRef:
+            name: cloudboard-secrets
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "250m"
+            memory: "256Mi"
