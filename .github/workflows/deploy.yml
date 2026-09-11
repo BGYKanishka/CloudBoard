@@ -1,0 +1,78 @@
+name: Deploy to AWS
+
+on:
+  workflow_dispatch: # Allows you to manually trigger the deployment from GitHub
+  push:
+    branches: [ "main" ]
+
+# Permission needed for OIDC
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+  # The role ARN is outputted by Terraform when you run `terraform apply` locally for the first time.
+  # Replace this placeholder with the actual `github_actions_role_arn` from your Terraform output, 
+  # or better yet, store it in GitHub Secrets: ${{ secrets.AWS_OIDC_ROLE_ARN }}
+  ROLE_TO_ASSUME: arn:aws:iam::519956515701:role/github-actions-deploy-role
+
+jobs:
+  deploy-infrastructure:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Configure AWS Credentials using OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.5.0" # Or whichever version you are using locally
+
+      - name: Terraform Init
+        run: |
+          cd infra/terraform/env/dev
+          terraform init
+
+      - name: Terraform Apply
+        run: |
+          cd infra/terraform/env/dev
+          # Automatically applies without prompting
+          # Note: We are passing a dummy password here for educational purposes. 
+          # In a real environment, store this as a GitHub Secret and pass it like:
+          # -var="db_password=${{ secrets.DB_PASSWORD }}"
+          terraform apply -auto-approve -var="db_password=GitHubActionsAutomatedPass123!"
+
+  build-and-push-images:
+    needs: deploy-infrastructure
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Configure AWS Credentials using OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and Push Backend Image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: cloudboard-api-dev
+          IMAGE_TAG: latest
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -f docker/backend.Dockerfile ./backend
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+      # Add a frontend build/push here eventually if needed

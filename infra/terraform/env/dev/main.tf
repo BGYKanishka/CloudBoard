@@ -51,3 +51,8 @@ module "compute" {
   public_subnet_ids = module.vpc.public_subnet_ids
   app_subnet_ids = module.vpc.public_subnet_ids # Using public subnets to save NAT Gateway costs
 }
+
+module "iam" {
+  source = "../../modules/iam"
+  github_repo = "BGYKanishka/CloudBoard"
+}
