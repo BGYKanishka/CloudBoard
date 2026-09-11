@@ -52,4 +52,3 @@ func UploadProfileImageHandler(w http.ResponseWriter, r *http.Request) {
 		"user_id": userID,
 	})
 }
-

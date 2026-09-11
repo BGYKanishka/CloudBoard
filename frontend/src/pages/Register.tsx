@@ -16,6 +16,7 @@ export default function Register({ onRegister }: { onRegister: () => void }) {
       await api.post('/auth/login', { email, password });
       onRegister();
     } catch (err) {
+      console.error(err);
       setError('Registration failed');
     }
   };

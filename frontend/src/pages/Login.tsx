@@ -13,6 +13,7 @@ export default function Login({ onLogin }: { onLogin: () => void }) {
       await api.post('/auth/login', { email, password });
       onLogin();
     } catch (err) {
+      console.error(err);
       setError('Invalid credentials');
     }
   };

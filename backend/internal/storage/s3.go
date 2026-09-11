@@ -20,7 +20,7 @@ func NewS3Storage(bucket, region string) *S3Storage {
 
 func (s *S3Storage) Upload(filename string, file io.Reader) (string, error) {
 	log.Printf("Simulating upload of %s to S3 bucket %s in region %s", filename, s.Bucket, s.Region)
-	
+
 	// This simulates returning an S3 URL
 	return fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", s.Bucket, s.Region, filename), nil
 }
