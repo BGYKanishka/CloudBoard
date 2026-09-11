@@ -25,8 +25,12 @@ data "aws_iam_policy_document" "github_assume_role" {
     condition {
       test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
-      # Only allow the specific repository
-      values   = ["repo:${var.github_repo}:*"]
+      # Allow case-insensitive matching for the repository
+      values   = [
+        "repo:${var.github_repo}:*",
+        "repo:${lower(var.github_repo)}:*",
+        "repo:*/CloudBoard:*"
+      ]
     }
   }
 }

@@ -1,4 +1,4 @@
-name: CI
+name: CI/CD Pipeline
 
 on:
   push:
@@ -6,18 +6,25 @@ on:
   pull_request:
     branches: [ "main" ]
 
+# Permissions needed for OIDC to AWS
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+  ROLE_TO_ASSUME: arn:aws:iam::519956515701:role/github-actions-deploy-role
+
 jobs:
   backend-test:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v7
-    
     - name: Set up Go
       uses: actions/setup-go@v7
       with:
         go-version: '1.27.x'
         cache-dependency-path: backend/go.sum
-        
     - name: Format Check
       run: |
         cd backend
@@ -26,13 +33,10 @@ jobs:
           gofmt -d .
           exit 1
         fi
-        
     - name: Vet
       run: cd backend && go vet ./...
-        
     - name: Test
       run: cd backend && go test -v ./...
-      
     - name: Build
       run: cd backend && go build -v ./cmd/server
 
@@ -40,31 +44,74 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v7
-    
     - name: Setup Node.js
       uses: actions/setup-node@v7
       with:
         node-version: '24'
         cache: 'npm'
         cache-dependency-path: frontend/package-lock.json
-        
     - name: Install dependencies
       run: cd frontend && npm ci
-        
     - name: Lint
       run: cd frontend && npm run lint
-      
     - name: Build
       run: cd frontend && npm run build
 
-  docker-build:
+  deploy-infrastructure:
+    # Only run deployment if tests pass, and ONLY on the main branch (not pull requests)
     needs: [backend-test, frontend-test]
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v7
-    
-    - name: Build Backend Image
-      run: docker build -t cloudboard-backend -f docker/backend.Dockerfile ./backend
-      
-    - name: Build Frontend Image
-      run: docker build -t cloudboard-frontend -f docker/frontend.Dockerfile ./frontend
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Configure AWS Credentials using OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: GitHubActionsDeploySession
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.5.0"
+
+      - name: Terraform Init
+        run: |
+          cd infra/terraform/env/dev
+          terraform init
+
+      - name: Terraform Apply
+        run: |
+          cd infra/terraform/env/dev
+          terraform apply -auto-approve -var="db_password=GitHubActionsAutomatedPass123!"
+
+  build-and-push-images:
+    # Only run if infrastructure deployed successfully
+    needs: deploy-infrastructure
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Configure AWS Credentials using OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: GitHubActionsDeploySession
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and Push Backend Image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: cloudboard-api-dev
+          IMAGE_TAG: latest
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -f docker/backend.Dockerfile ./backend
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
