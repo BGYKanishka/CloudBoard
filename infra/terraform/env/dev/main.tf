@@ -11,7 +11,6 @@ provider "aws" {
   region = var.aws_region
 }
 
-# Example VPC
 module "vpc" {
   source = "../../modules/network"
   
@@ -22,5 +21,33 @@ module "vpc" {
   azs = ["us-east-1a", "us-east-1b"]
 }
 
-# Note: This is a simplified skeleton. 
-# A full production deployment would include ALB, ASG, RDS, S3 calls here.
+resource "random_id" "bucket_id" {
+  byte_length = 4
+}
+
+module "storage" {
+  source = "../../modules/storage"
+  bucket_name = "cloudboard-profile-pics-dev-${random_id.bucket_id.hex}"
+}
+
+module "ecr" {
+  source = "../../modules/ecr"
+  repository_name = "cloudboard-api-dev"
+}
+
+module "database" {
+  source = "../../modules/database"
+  vpc_id = module.vpc.vpc_id
+  vpc_cidr = "10.0.0.0/16"
+  db_subnet_ids = module.vpc.private_db_subnet_ids
+  db_name = "cloudboard"
+  db_username = "postgres"
+  db_password = var.db_password
+}
+
+module "compute" {
+  source = "../../modules/compute"
+  vpc_id = module.vpc.vpc_id
+  public_subnet_ids = module.vpc.public_subnet_ids
+  app_subnet_ids = module.vpc.public_subnet_ids # Using public subnets to save NAT Gateway costs
+}
