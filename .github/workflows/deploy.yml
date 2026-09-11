@@ -18,7 +18,7 @@ env:
   ROLE_TO_ASSUME: arn:aws:iam::519956515701:role/github-actions-deploy-role
 
 jobs:
-  deploy-infrastructure:
+  deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -29,11 +29,12 @@ jobs:
         with:
           role-to-assume: ${{ env.ROLE_TO_ASSUME }}
           aws-region: ${{ env.AWS_REGION }}
+          role-session-name: GitHubActionsDeploySession
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: "1.5.0" # Or whichever version you are using locally
+          terraform_version: "1.5.0"
 
       - name: Terraform Init
         run: |
@@ -43,24 +44,7 @@ jobs:
       - name: Terraform Apply
         run: |
           cd infra/terraform/env/dev
-          # Automatically applies without prompting
-          # Note: We are passing a dummy password here for educational purposes. 
-          # In a real environment, store this as a GitHub Secret and pass it like:
-          # -var="db_password=${{ secrets.DB_PASSWORD }}"
           terraform apply -auto-approve -var="db_password=GitHubActionsAutomatedPass123!"
-
-  build-and-push-images:
-    needs: deploy-infrastructure
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
-
-      - name: Configure AWS Credentials using OIDC
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ env.ROLE_TO_ASSUME }}
-          aws-region: ${{ env.AWS_REGION }}
 
       - name: Login to Amazon ECR
         id: login-ecr
